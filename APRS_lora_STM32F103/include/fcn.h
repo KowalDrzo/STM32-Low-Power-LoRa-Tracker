@@ -8,14 +8,12 @@
 #include <LoRa.h>
 #include <EEPROM.h>
 #include "gpsData.h"
+#include "stm32f1xx_hal.h"
 
 void loraInit();
-void loraSetConditions(uint32_t freq, uint8_t sf, uint8_t cr);
 void loraSend(String txString);
-uint16_t calculateAngle(GpsData gps1, GpsData gps2);
-String createFrame(GpsData gpsData, GpsData oldGpsData);
+String createFrame(GpsData gpsData);
 void goToSleep(uint16_t seconds);
 float getVoltage();
-bool isDistanceEnough(GpsData gpsData, GpsData oldGpsData);
 
 #endif

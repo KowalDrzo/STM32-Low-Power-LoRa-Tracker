@@ -2,27 +2,19 @@
 
 void loraInit() {
 
-    SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN, LORA_CS_PIN);
+    SPI.begin();
     LoRa.setPins(LORA_CS_PIN, LORA_RES_PIN, LORA_D0_PIN);
     LoRa.setSignalBandwidth(125E3);
 
-    if (LoRa.begin(433775000)) Serial.println("LoRa dziala");
-    else Serial.println("LoRa nie dziala");
+    int ret = LoRa.begin(433775000);
+    delay(ret);
 
     LoRa.setTimeout(100);
     LoRa.setTxPower(12);
     LoRa.enableCrc();
 
-    LoRa.sleep();
-}
-
-void loraSetConditions(uint32_t freq, uint8_t sf, uint8_t cr) {
-
-    LoRa.idle();
-
-    LoRa.setFrequency(freq);
-    LoRa.setSpreadingFactor(sf);
-    LoRa.setCodingRate4(cr);
+    LoRa.setSpreadingFactor(12);
+    LoRa.setCodingRate4(5);
 }
 
 void loraSend(String txString) {
@@ -43,8 +35,16 @@ String create_lat_aprs(double lat) {
     if (lat < 0) {
         n_s = 'S';
     }
-    lat = std::abs(lat);
-    sprintf(str, "%02d%05.2f%c", (int)lat, (lat - (double)((int)lat)) * 60.0, n_s);
+    /*lat = std::abs(lat);
+    sprintf(str, "%02d%05.2f%c", (int)lat, (lat - (double)((int)lat)) * 60.0, n_s);*/
+
+    int deg = (int)lat;
+    int minutes100 = (int)((lat - deg) * 6000 + 0.5); // minuty * 100
+    int min_int = minutes100 / 100;
+    int min_frac = minutes100 % 100;
+
+    sprintf(str, "%02d%02d.%02d%c", deg, min_int, min_frac, n_s);
+
     String lat_str(str);
     return lat_str;
 }
@@ -55,39 +55,30 @@ String create_long_aprs(double lng) {
     if (lng < 0) {
         e_w = 'W';
     }
-    lng = std::abs(lng);
-    sprintf(str, "%03d%05.2f%c", (int)lng, (lng - (double)((int)lng)) * 60.0, e_w);
+    /*lng = std::abs(lng);
+    sprintf(str, "%03d%05.2f%c", (int)lng, (lng - (double)((int)lng)) * 60.0, e_w);*/
+
+    int deg = (int)lng;
+    int minutes100 = (int)((lng - deg) * 6000 + 0.5); // minuty * 100
+    int min_int = minutes100 / 100;
+    int min_frac = minutes100 % 100;
+
+    sprintf(str, "%03d%02d.%02d%c", deg, min_int, min_frac, e_w);
+
     String lng_str(str);
     return lng_str;
 }
 
-uint16_t calculateAngle(GpsData gps1, GpsData gps2) {
-
-    const double deltaLon = gps2.lng - gps1.lng;
-
-    const double x = cos(gps2.lat * PI / 180.0) * sin(deltaLon * PI / 180.0);
-    const double y = cos(gps1.lat * PI / 180.0) * sin(gps2.lat * PI / 180.0) -
-                     sin(gps1.lat * PI / 180.0) * cos(gps2.lat * PI / 180.0) *
-                     cos(deltaLon * PI / 180.0);
-
-    int16_t bearing = atan2(x, y) * 180.0 / PI;
-
-    // Konwersja z (-180, 180] do [0, 360):
-    if (bearing < 0) bearing += 360;
-    return bearing % 360;
-}
-
-String createFrame(GpsData gpsData, GpsData oldGpsData) {
+String createFrame(GpsData gpsData) {
 
     String latString = create_lat_aprs(gpsData.lat);
     String lngString = create_long_aprs(gpsData.lng);
 
     char altString[10], speedString[20];
     sprintf(altString, "%06d", gpsData.alt);
-    if (gpsData.speed == 0) gpsData.speed = 1;
-    sprintf(speedString, "%03d/%03d", calculateAngle(oldGpsData, gpsData), gpsData.speed);
+    sprintf(speedString, "000/%03d", gpsData.speed);
 
-    String frame = "SP3MIK-13>APLT00,WIDE";
+    String frame = "SP3MIK-11>APLT00,WIDE";
 
     if (gpsData.alt > 3000) frame += String(1);
     else frame += String(2);
@@ -99,15 +90,29 @@ String createFrame(GpsData gpsData, GpsData oldGpsData) {
     frame += "/A=";
     frame += altString; //000390
     frame += String(getVoltage(), 2) + "V";
+    frame += String(gpsData.sats) + "S";
 
     return frame;
 }
 
 void goToSleep(uint16_t seconds) {
 
-    Serial.println("Going to sleep!");
-    esp_sleep_enable_timer_wakeup(seconds * 1e6);
-    esp_deep_sleep_start();
+    __HAL_RCC_PWR_CLK_ENABLE();
+
+    // Wyczyść flagę wakeup
+    PWR->CR |= PWR_CR_CWUF;
+
+    uint32_t now = (RTC->CNTH << 16) | RTC->CNTL;
+
+    // ustaw alarm
+    RTC->ALRH = (now + seconds >> 16) & 0xFFFF;
+    RTC->ALRL = now + seconds & 0xFFFF;
+
+    // standby
+    PWR->CR |= PWR_CR_PDDS;
+    SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
+
+    __WFI();
 }
 
 float getVoltage() {
@@ -115,16 +120,8 @@ float getVoltage() {
     float voltage = 0.0;
     uint16_t adcValue = analogRead(V_SENSE_PIN);
     if (adcValue > 0) {
-        voltage = ((adcValue / 4095.0) * (3.3 - 0.2)) * 3;
+        voltage = (adcValue / 4095.0) * 3.3 * 3;
     }
 
     return voltage;
-}
-
-bool isDistanceEnough(GpsData gpsData, GpsData oldGpsData) {
-
-    float latDiff = fabs(gpsData.lat - oldGpsData.lat);
-    float lngDiff = fabs(gpsData.lng - oldGpsData.lng);
-
-    return latDiff > 0.001 || lngDiff > 0.001;
 }
