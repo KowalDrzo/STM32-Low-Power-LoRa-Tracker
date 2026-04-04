@@ -26,6 +26,10 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include "nmea_parse.h"
+#include "LoRa.h"
+#include "SX1278.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -35,6 +39,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+#define GPS_BUFFER_SIZE 512
 
 /* USER CODE END PD */
 
@@ -46,6 +52,12 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+
+GPS gps;
+uint8_t gpsBuffer[GPS_BUFFER_SIZE];
+
+SX1278_hw_t SX1278_hw;
+SX1278_t SX1278;
 
 /* USER CODE END PV */
 
@@ -93,16 +105,57 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
+  HAL_Delay(100);
+  char gpsBalloonMode[] = "$PMTK886,3*2B\r\n";
+  HAL_UART_Transmit(&huart2, (uint8_t*) gpsBalloonMode, strlen(gpsBalloonMode), 100);
+
+  char loraTxBuffer[256];
+  memset(loraTxBuffer, 0, 256);
+  loraTxBuffer[0] = '<';
+  loraTxBuffer[1] = 0xFF;
+  loraTxBuffer[2] = 0x01;
+  char test_message[] = "SP3MIK-11>APLT00,WIDE1-1:!5106.57N/01703.45EO000/000/A=000390TESTING_ONLY!!";
+  memcpy(&loraTxBuffer[3], (uint8_t*) test_message, strlen(test_message));
+  HAL_Delay(100);
+
+  //initialize LoRa module
+	/*SX1278_hw.nss.port = LORA_CS_GPIO_Port;
+	SX1278_hw.nss.pin = LORA_CS_Pin;
+	SX1278_hw.spi = &hspi1;
+
+	SX1278.hw = &SX1278_hw;
+
+	SX1278_init(&SX1278, 433775000, SX1278_POWER_14DBM, SX1278_LORA_SF_12,
+		SX1278_LORA_BW_125KHZ, SX1278_LORA_CR_4_5, SX1278_LORA_CRC_EN, 10);
+
+	SX1278_LoRaEntryTx(&SX1278, strlen(test_message) + 3, 2000);
+	SX1278_LoRaTxPacket(&SX1278, (uint8_t*) loraTxBuffer,
+			strlen(test_message) + 3, 2000);*/
+
+
+  LoRa_Init(433775000);
+  LoRa_SetModemConfig();
+
+  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
+  LoRa_Send(loraTxBuffer, strlen(test_message) + 3);
+  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);
+
+  LoRa_Sleep();
+
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);
+	  HAL_UART_Receive(&huart2, gpsBuffer, GPS_BUFFER_SIZE, 1000);
+	  nmea_parse(&gps, gpsBuffer);
+	  /*HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);
 	  HAL_Delay(100);
 	  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
-	  HAL_Delay(100);
+	  HAL_Delay(100);*/
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
