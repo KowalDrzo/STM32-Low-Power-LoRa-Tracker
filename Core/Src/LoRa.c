@@ -102,20 +102,6 @@ void LoRa_SetModemConfig()
 
 	// crc
 	LoRa_WriteReg(REG_MODEM_CONFIG2, LoRa_ReadReg(REG_MODEM_CONFIG2) | 0x04);
-
-    uint8_t op = LoRa_ReadReg(REG_OP_MODE);
-
-    uint32_t frf = (LoRa_ReadReg(0x06) << 16) |
-                   (LoRa_ReadReg(0x07) << 8) |
-                   LoRa_ReadReg(0x08);
-
-    double freq_mhz = frf * 32.0e6 / 524288.0 / 1e6; // w MHz
-
-    uint8_t mc1 = LoRa_ReadReg(0x1D);
-    uint8_t mc2 = LoRa_ReadReg(0x1E);
-    uint8_t mc3 = LoRa_ReadReg(0x26);
-
-    int i;
 }
 
 void LoRa_Send(char *data, uint8_t len)

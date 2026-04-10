@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "adc.h"
+#include "rtc.h"
 #include "spi.h"
 #include "usart.h"
 #include "gpio.h"
@@ -28,7 +29,7 @@
 
 #include "nmea_parse.h"
 #include "LoRa.h"
-#include "SX1278.h"
+#include "fcn.h"
 
 /* USER CODE END Includes */
 
@@ -55,9 +56,6 @@
 
 GPS gps;
 uint8_t gpsBuffer[GPS_BUFFER_SIZE];
-
-SX1278_hw_t SX1278_hw;
-SX1278_t SX1278;
 
 /* USER CODE END PV */
 
@@ -103,49 +101,43 @@ int main(void)
   MX_ADC1_Init();
   MX_SPI1_Init();
   MX_USART2_UART_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
 
   HAL_Delay(100);
   char gpsBalloonMode[] = "$PMTK886,3*2B\r\n";
   HAL_UART_Transmit(&huart2, (uint8_t*) gpsBalloonMode, strlen(gpsBalloonMode), 100);
 
-  char loraTxBuffer[256];
-  memset(loraTxBuffer, 0, 256);
+  char loraTxBuffer[255];
+  memset(loraTxBuffer, 0, 255);
   loraTxBuffer[0] = '<';
   loraTxBuffer[1] = 0xFF;
   loraTxBuffer[2] = 0x01;
-  char test_message[] = "SP3MIK-11>APLT00,WIDE1-1:!5106.57N/01703.45EO000/000/A=000390TESTING_ONLY!!";
-  memcpy(&loraTxBuffer[3], (uint8_t*) test_message, strlen(test_message));
+  char tx_message[255];
+
+  float voltage = (read_adc() / 4095.0) * 3.3 * 3.1;
+
+  while (!gps.fix) {
+	  HAL_UART_Receive(&huart2, gpsBuffer, GPS_BUFFER_SIZE, 1000);
+	  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
+	  nmea_parse(&gps, gpsBuffer);
+	  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);
+  }
+
+  createFrame(tx_message, 255, gps, voltage);
+  memcpy(&loraTxBuffer[3], (uint8_t*) tx_message, strlen(tx_message));
   HAL_Delay(100);
 
-  int kupa = strlen(test_message);
 
-  //initialize LoRa module
-	/*SX1278_hw.nss.port = LORA_CS_GPIO_Port;
-	SX1278_hw.nss.pin = LORA_CS_Pin;
-	SX1278_hw.spi = &hspi1;
-
-	SX1278.hw = &SX1278_hw;
-
-	SX1278_init(&SX1278, 433775000, SX1278_POWER_11DBM, SX1278_LORA_SF_12,
-		SX1278_LORA_BW_125KHZ, SX1278_LORA_CR_4_5, SX1278_LORA_CRC_EN, strlen(test_message) + 3);
-
-	SX1278_LoRaEntryTx(&SX1278, strlen(test_message) + 3, 9000);
-	SX1278_LoRaTxPacket(&SX1278, (uint8_t*) loraTxBuffer,
-			strlen(test_message) + 3, 2000);*/
-
-
-  //LoRa_Init(433775000);
-  //LoRa_SetModemConfig();
   LoRa_config_polifloater();
 
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
-  LoRa_Send(loraTxBuffer, strlen(test_message) + 3);
+  LoRa_Send(loraTxBuffer, strlen(tx_message) + 3);
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);
 
   LoRa_Sleep();
 
-
+  Enter_Standby_s(315);
 
   /* USER CODE END 2 */
 
@@ -153,12 +145,6 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_UART_Receive(&huart2, gpsBuffer, GPS_BUFFER_SIZE, 1000);
-	  nmea_parse(&gps, gpsBuffer);
-	  /*HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);
-	  HAL_Delay(100);
-	  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
-	  HAL_Delay(100);*/
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -179,9 +165,10 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL2;
@@ -203,7 +190,8 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC|RCC_PERIPHCLK_ADC;
+  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
   PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {

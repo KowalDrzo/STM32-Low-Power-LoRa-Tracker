@@ -44,8 +44,8 @@ int nmea_GPGGA(GPS *gps_data, char*inputString){
     char latSide = values[3][0];
     strcpy(gps_data->lastMeasure, values[1]);
     if(latSide == 'S' || latSide == 'N'){
-        char lat_d[2];
-        char lat_m[7];
+    	char lat_d[3] = {0};
+    	char lat_m[8] = {0};
         for (int z = 0; z < 2; z++) lat_d[z] = values[2][z];
         for (int z = 0; z < 6; z++) lat_m[z] = values[2][z + 2];
 
@@ -53,8 +53,8 @@ int nmea_GPGGA(GPS *gps_data, char*inputString){
         float lat_min_strtof = strtof(lat_m, NULL);
         double lat_deg = lat_deg_strtol + lat_min_strtof / 60;
 
-        char lon_d[3];
-        char lon_m[7];
+        char lon_d[4] = {0};
+        char lon_m[8] = {0};
 
         for (int z = 0; z < 3; z++) lon_d[z] = values[4][z];
         for (int z = 0; z < 6; z++) lon_m[z] = values[4][z + 3];
@@ -128,8 +128,8 @@ int nmea_GPGLL(GPS *gps_data, char*inputString) {
     }
     char latSide = values[2][0];
     if (latSide == 'S' || latSide == 'N') { //check if data is sorta intact
-        char lat_d[2];
-        char lat_m[7];
+    	char lat_d[3] = {0};
+    	char lat_m[8] = {0};
         for (int z = 0; z < 2; z++) lat_d[z] = values[1][z];
         for (int z = 0; z < 6; z++) lat_m[z] = values[1][z + 2];
 
@@ -137,8 +137,8 @@ int nmea_GPGLL(GPS *gps_data, char*inputString) {
         float lat_min_strtof = strtof(lat_m, NULL);
         double lat_deg = lat_deg_strtol + lat_min_strtof / 60;
 
-        char lon_d[3];
-        char lon_m[7];
+        char lon_d[4] = {0};
+        char lon_m[8] = {0};
         char lonSide = values[4][0];
         for (int z = 0; z < 3; z++) lon_d[z] = values[3][z];
         for (int z = 0; z < 6; z++) lon_m[z] = values[3][z + 3];
@@ -163,6 +163,28 @@ int nmea_GPGLL(GPS *gps_data, char*inputString) {
     else return 0;
 }
 
+int nmea_GPRMC(GPS *gps_data, char* inputString)
+{
+    char *values[25];
+    int counter = 0;
+
+    char *marker = strtok(inputString, ",");
+    while (marker != NULL) {
+        values[counter++] = marker;
+        marker = strtok(NULL, ",");
+    }
+
+    // speed
+    float speed_knots = strtof(values[7], NULL);
+    gps_data->speed_knots = speed_knots;
+
+    // heading (COURSE OVER GROUND)
+    float heading = strtof(values[8], NULL);
+    gps_data->heading = heading;
+
+    return 1;
+}
+
 void nmea_parse(GPS *gps_data, uint8_t *buffer){
     memset(data, 0, sizeof(data));
     char * token = strtok(buffer, "$");
@@ -182,6 +204,9 @@ void nmea_parse(GPS *gps_data, uint8_t *buffer){
            }
            else if(strstr(data[i], "GPGGA")!=NULL){
                nmea_GPGGA(gps_data, data[i]);
+           }
+           else if(strstr(data[i], "GPRMC") != NULL || strstr(data[i], "GNRMC") != NULL){
+               nmea_GPRMC(gps_data, data[i]);
            }
        }
 

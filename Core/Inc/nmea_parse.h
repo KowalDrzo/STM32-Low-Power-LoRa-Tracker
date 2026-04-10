@@ -21,6 +21,8 @@ typedef struct NMEA_DATA {
     float hdop; //horizontal dilution of precision
     int satelliteCount; //number of satellites used in measurement
     int fix; // 1 = fix, 0 = no fix
+    float speed_knots;
+    float heading;
     char lastMeasure[10]; // hhmmss.ss UTC of last successful measurement; time read from the GPS module
 } GPS;
 /*******************************************************************************
