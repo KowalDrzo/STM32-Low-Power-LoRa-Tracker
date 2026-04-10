@@ -11,4 +11,6 @@ void LoRa_SetModemConfig();
 void LoRa_Sleep();
 void LoRa_Send(char *data, uint8_t len);
 
+void LoRa_config_polifloater();
+
 #endif /* INC_LORA_H_ */

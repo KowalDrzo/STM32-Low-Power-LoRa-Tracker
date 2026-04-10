@@ -118,6 +118,8 @@ int main(void)
   memcpy(&loraTxBuffer[3], (uint8_t*) test_message, strlen(test_message));
   HAL_Delay(100);
 
+  int kupa = strlen(test_message);
+
   //initialize LoRa module
 	/*SX1278_hw.nss.port = LORA_CS_GPIO_Port;
 	SX1278_hw.nss.pin = LORA_CS_Pin;
@@ -125,16 +127,17 @@ int main(void)
 
 	SX1278.hw = &SX1278_hw;
 
-	SX1278_init(&SX1278, 433775000, SX1278_POWER_14DBM, SX1278_LORA_SF_12,
-		SX1278_LORA_BW_125KHZ, SX1278_LORA_CR_4_5, SX1278_LORA_CRC_EN, 10);
+	SX1278_init(&SX1278, 433775000, SX1278_POWER_11DBM, SX1278_LORA_SF_12,
+		SX1278_LORA_BW_125KHZ, SX1278_LORA_CR_4_5, SX1278_LORA_CRC_EN, strlen(test_message) + 3);
 
-	SX1278_LoRaEntryTx(&SX1278, strlen(test_message) + 3, 2000);
+	SX1278_LoRaEntryTx(&SX1278, strlen(test_message) + 3, 9000);
 	SX1278_LoRaTxPacket(&SX1278, (uint8_t*) loraTxBuffer,
 			strlen(test_message) + 3, 2000);*/
 
 
-  LoRa_Init(433775000);
-  LoRa_SetModemConfig();
+  //LoRa_Init(433775000);
+  //LoRa_SetModemConfig();
+  LoRa_config_polifloater();
 
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
   LoRa_Send(loraTxBuffer, strlen(test_message) + 3);
@@ -179,7 +182,9 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL2;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -189,9 +194,9 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV8;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV16;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
@@ -199,7 +204,7 @@ void SystemClock_Config(void)
     Error_Handler();
   }
   PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
-  PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV2;
+  PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();

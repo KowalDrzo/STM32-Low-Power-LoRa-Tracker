@@ -63,7 +63,7 @@ bool LoRa_Init(uint32_t frequency)
 	LoRa_WriteReg(REG_LNA, LoRa_ReadReg(REG_LNA) | 0x03);
 
 	// set auto AGC
-	LoRa_WriteReg(REG_MODEM_CONFIG3, 0x04);
+	LoRa_WriteReg(REG_MODEM_CONFIG3, 0x0C);
 
 	// set output power to 14 dBm
 	LoRa_WriteReg(REG_PA_CONFIG, 0x8C);
@@ -128,16 +128,21 @@ void LoRa_Send(char *data, uint8_t len)
     // FIFO reset
     LoRa_WriteReg(0x0D, 0x00);
     LoRa_WriteReg(0x22, 0x00);
-    LoRa_WriteReg(REG_FIFO_TX_BASE, 0x00);
-    LoRa_WriteReg(REG_FIFO_ADDR_PTR, 0x00);
 
-    // Write payload
-    for (int i = 0; i < len; i++)
-    {
-        LoRa_WriteReg(REG_FIFO, data[i]);
-    }
+    int currentLength = LoRa_ReadReg(0x22);
 
-    LoRa_WriteReg(REG_PAYLOAD_LENGTH, len);
+      // check size
+      if ((currentLength + len) > 255) {
+        len = 255 - currentLength;
+      }
+
+      // write data
+      for (size_t i = 0; i < len; i++) {
+    	  LoRa_WriteReg(REG_FIFO, data[i]);
+      }
+
+      // update length
+      LoRa_WriteReg(0x22, currentLength + len);
 
     // TX mode
     LoRa_WriteReg(REG_OP_MODE, 0x83);
@@ -156,4 +161,39 @@ void LoRa_Send(char *data, uint8_t len)
 void LoRa_Sleep()
 {
     LoRa_WriteReg(REG_OP_MODE, 0x80);
+}
+
+void LoRa_config_polifloater() {
+
+	LoRa_WriteReg(0x1d,0x70);
+	LoRa_WriteReg(0x26,0x0);
+	LoRa_WriteReg(0x1,0x80);
+	LoRa_WriteReg(0x6,0x6c);
+	LoRa_WriteReg(0x7,0x71);
+	LoRa_WriteReg(0x8,0x99);
+	LoRa_WriteReg(0xe,0x0);
+	LoRa_WriteReg(0xf,0x0);
+	LoRa_WriteReg(0xc,0x23);
+	LoRa_WriteReg(0x26,0x4);
+	LoRa_WriteReg(0x4d,0x84);
+	LoRa_WriteReg(0xb,0x2b);
+	LoRa_WriteReg(0x9,0x8f);
+	LoRa_WriteReg(0x1,0x81);
+
+	HAL_Delay(100);
+
+	LoRa_WriteReg(0x4d,0x84);
+	LoRa_WriteReg(0xb,0x2b);
+	LoRa_WriteReg(0x9,0x8a);
+	LoRa_WriteReg(0x1e,0x74);
+	LoRa_WriteReg(0x1,0x80);
+	LoRa_WriteReg(0x1,0x81);
+	LoRa_WriteReg(0x6,0x6c);
+	LoRa_WriteReg(0x7,0x71);
+	LoRa_WriteReg(0x8,0x99);
+	LoRa_WriteReg(0x31,0xc3);
+	LoRa_WriteReg(0x37,0xa);
+	LoRa_WriteReg(0x1e,0xc4);
+	LoRa_WriteReg(0x26,0xc);
+	LoRa_WriteReg(0x1d,0x72);
 }

@@ -200,8 +200,8 @@ static const uint8_t SX1278_LoRaBandwidth[10] = { 0, //   7.8KHz,
 static const uint8_t SX1278_CodingRate[4] = { 0x01, 0x02, 0x03, 0x04 };
 
 //CRC Enable
-#define SX1278_LORA_CRC_EN              0
-#define SX1278_LORA_CRC_DIS             1
+#define SX1278_LORA_CRC_EN              1
+#define SX1278_LORA_CRC_DIS             0
 
 static const uint8_t SX1278_CRC_Sum[2] = { 0x01, 0x00 };
 
