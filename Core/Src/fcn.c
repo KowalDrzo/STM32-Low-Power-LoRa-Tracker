@@ -22,7 +22,7 @@ void createFrame(char* buffer, uint8_t maxLen, GPS gps, float voltage) {
 	uint8_t voltage_frac = (int)(voltage * 100) % 100;
 
 	sprintf(
-		buffer, "SP3MIK-11>APLT00,WIDE%d-1:!%02d%02d.%02d%c/%03d%02d.%02d%cO%03d/%03d/A=%06d%d.%dV%dS",
+		buffer, "SP3MIK-12>APLT00,WIDE%d-1:!%02d%02d.%02d%c/%03d%02d.%02d%cO%03d/%03d/A=%06d%d.%dV%dS",
 		wide,
 		lat_deg, lat_min_int, lat_min_frac, gps.latSide,
 		lon_deg, lon_min_int, lon_min_frac, gps.lonSide,

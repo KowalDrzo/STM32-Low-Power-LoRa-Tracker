@@ -115,10 +115,10 @@ int main(void)
   loraTxBuffer[2] = 0x01;
   char tx_message[255];
 
-  float voltage = (read_adc() / 4095.0) * 3.3 * 3.1;
+  float voltage = (read_adc() / 4095.0) * 3.3 * 3;
 
-  while (!gps.fix) {
-	  HAL_UART_Receive(&huart2, gpsBuffer, GPS_BUFFER_SIZE, 1000);
+  while (!gps.fix || gps.altitude < 10) {
+	  HAL_UART_Receive(&huart2, gpsBuffer, GPS_BUFFER_SIZE, 3000);
 	  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
 	  nmea_parse(&gps, gpsBuffer);
 	  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);
