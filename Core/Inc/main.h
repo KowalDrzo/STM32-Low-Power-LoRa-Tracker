@@ -61,6 +61,8 @@ void Error_Handler(void);
 #define LED_GPIO_Port GPIOC
 #define LORA_CS_Pin GPIO_PIN_4
 #define LORA_CS_GPIO_Port GPIOA
+#define GPS_EN_Pin GPIO_PIN_10
+#define GPS_EN_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
 

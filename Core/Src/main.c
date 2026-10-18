@@ -104,6 +104,7 @@ int main(void)
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
 
+  HAL_GPIO_WritePin(GPS_EN_GPIO_Port, GPS_EN_Pin, 0); // Turn on GPS.
   HAL_Delay(100);
   char gpsBalloonMode[] = "$PMTK886,3*2B\r\n";
   HAL_UART_Transmit(&huart2, (uint8_t*) gpsBalloonMode, strlen(gpsBalloonMode), 100);
@@ -124,6 +125,7 @@ int main(void)
 	  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);
   }
 
+  HAL_GPIO_WritePin(GPS_EN_GPIO_Port, GPS_EN_Pin, 1); // Turn off GPS.
   createFrame(tx_message, 255, gps, voltage);
   memcpy(&loraTxBuffer[3], (uint8_t*) tx_message, strlen(tx_message));
   HAL_Delay(100);
