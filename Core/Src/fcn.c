@@ -4,8 +4,6 @@ void createFrame(char* buffer, uint8_t maxLen, GPS gps, float voltage) {
 
 	memset(buffer, 0, maxLen);
 
-	uint8_t wide = gps.altitude > 1500 ? 1 : 2;
-
 	int lat_deg = (int)gps.latitude;
 	int lat_minutes100 = (int)((gps.latitude - lat_deg) * 6000 + 0.5); // minuty * 100
 	int lat_min_int = lat_minutes100 / 100;
@@ -22,14 +20,22 @@ void createFrame(char* buffer, uint8_t maxLen, GPS gps, float voltage) {
 	uint8_t voltage_frac = (int)(voltage * 100) % 100;
 
 	sprintf(
-		buffer, "SP3MIK-12>APLT00,WIDE%d-1:!%02d%02d.%02d%c/%03d%02d.%02d%cO%03d/%03d/A=%06d%d.%dV%dS",
-		wide,
+		buffer, "SP3MIK-12>APLT00,WIDE1-1:!%02d%02d.%02d%c/%03d%02d.%02d%cO%03d/%03d/A=%06d%d.%dV%dS",
 		lat_deg, lat_min_int, lat_min_frac, gps.latSide,
 		lon_deg, lon_min_int, lon_min_frac, gps.lonSide,
 		(int)gps.heading, (int)gps.speed_knots,
 		(int)alt_ft,
 		(int)voltage_int, (int)voltage_frac, gps.satelliteCount
 	);
+}
+
+void createStatusFrame(char* buffer, uint8_t maxLen, float voltage) {
+	uint8_t voltage_int = (uint8_t)voltage;
+	uint8_t voltage_frac = (uint8_t)(voltage * 100) % 100;
+
+	snprintf(buffer, maxLen,
+		"SP3MIK-12>APLT00:>%u.%02uV",
+		(unsigned int)voltage_int, (unsigned int)voltage_frac);
 }
 
 uint32_t read_adc() {
@@ -45,48 +51,10 @@ uint32_t read_adc() {
     return 0; // błąd
 }
 
-void Enter_Standby_s(uint32_t seconds)
+static volatile uint8_t rtcAlarmFired = 0;
+
+void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *rtc)
 {
-    RTC_TimeTypeDef time;
-    RTC_DateTypeDef date;
-    RTC_AlarmTypeDef sAlarm = {0};
-
-    // 🔹 Pobierz czas
-    HAL_RTC_GetTime(&hrtc, &time, RTC_FORMAT_BIN);
-    HAL_RTC_GetDate(&hrtc, &date, RTC_FORMAT_BIN);
-
-    uint32_t total_seconds =
-        time.Hours * 3600 +
-        time.Minutes * 60 +
-        time.Seconds;
-
-    total_seconds += seconds;
-
-    sAlarm.AlarmTime.Hours   = (total_seconds / 3600) % 24;
-    sAlarm.AlarmTime.Minutes = (total_seconds % 3600) / 60;
-    sAlarm.AlarmTime.Seconds = total_seconds % 60;
-
-    sAlarm.Alarm = RTC_ALARM_A;
-
-    // 🔴 1. Dezaktywuj alarm
-    HAL_RTC_DeactivateAlarm(&hrtc, RTC_ALARM_A);
-
-    // 🔴 2. Wyczyść flagę alarmu RTC
-    __HAL_RTC_ALARM_CLEAR_FLAG(&hrtc, RTC_FLAG_ALRAF);
-
-    // 🔴 3. (KLUCZOWE!) Wyczyść EXTI line od RTC alarm
-    __HAL_RTC_ALARM_EXTI_CLEAR_FLAG();
-
-    // 🔴 4. Wyczyść flagi wakeup PWR
-    __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
-    __HAL_PWR_CLEAR_FLAG(PWR_FLAG_SB);
-
-    // 🔹 Ustaw alarm
-    if (HAL_RTC_SetAlarm_IT(&hrtc, &sAlarm, RTC_FORMAT_BIN) != HAL_OK)
-    {
-        Error_Handler();
-    }
-
-    // 🔹 Standby
-    HAL_PWR_EnterSTANDBYMode();
+    (void)rtc;
+    rtcAlarmFired = 1;
 }

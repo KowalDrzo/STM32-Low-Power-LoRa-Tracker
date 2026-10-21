@@ -42,6 +42,7 @@
 /* USER CODE BEGIN PD */
 
 #define GPS_BUFFER_SIZE 512
+#define GPS_FIX_TIMEOUT_MS 120000U
 
 /* USER CODE END PD */
 
@@ -104,43 +105,57 @@ int main(void)
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
 
-  HAL_GPIO_WritePin(GPS_EN_GPIO_Port, GPS_EN_Pin, 0); // Turn on GPS.
-  HAL_Delay(100);
-  char gpsBalloonMode[] = "$PMTK886,3*2B\r\n";
-  HAL_UART_Transmit(&huart2, (uint8_t*) gpsBalloonMode, strlen(gpsBalloonMode), 100);
+  while(1) {
+	  memset(&gps, 0, sizeof(gps));
+	  HAL_GPIO_WritePin(GPS_EN_GPIO_Port, GPS_EN_Pin, 0); // Turn on GPS.
+	  HAL_Delay(100);
+	  char gpsBalloonMode[] = "$PMTK886,3*2B\r\n";
+	  HAL_UART_Transmit(&huart2, (uint8_t*) gpsBalloonMode, strlen(gpsBalloonMode), 100);
 
-  char loraTxBuffer[255];
-  memset(loraTxBuffer, 0, 255);
-  loraTxBuffer[0] = '<';
-  loraTxBuffer[1] = 0xFF;
-  loraTxBuffer[2] = 0x01;
-  char tx_message[255];
+	  char loraTxBuffer[255];
+	  memset(loraTxBuffer, 0, 255);
+	  loraTxBuffer[0] = '<';
+	  loraTxBuffer[1] = 0xFF;
+	  loraTxBuffer[2] = 0x01;
+	  char tx_message[255];
 
-  float voltage = (read_adc() / 4095.0) * 3.3 * 3;
+	  float voltage = (read_adc() / 4095.0) * 3.3 * 3;
 
-  while (!gps.fix || gps.altitude < 10) {
-	  HAL_UART_Receive(&huart2, gpsBuffer, GPS_BUFFER_SIZE, 3000);
+	  uint32_t gpsWaitStart = HAL_GetTick();
+	  uint8_t gpsFound = 0;
+	  while ((!gps.fix || gps.altitude < 10) &&
+			 ((uint32_t)(HAL_GetTick() - gpsWaitStart) < GPS_FIX_TIMEOUT_MS)) {
+		  uint32_t elapsed = HAL_GetTick() - gpsWaitStart;
+		  uint32_t remaining = GPS_FIX_TIMEOUT_MS - elapsed;
+		  uint32_t receiveTimeout = (remaining < 3000U) ? remaining : 3000U;
+		  memset(gpsBuffer, 0, sizeof(gpsBuffer));
+		  HAL_UART_Receive(&huart2, gpsBuffer, GPS_BUFFER_SIZE, receiveTimeout);
+		  //HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
+		  nmea_parse(&gps, gpsBuffer);
+		  //HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);
+	  }
+
+	  gpsFound = gps.fix && gps.altitude >= 10;
+
+	  HAL_GPIO_WritePin(GPS_EN_GPIO_Port, GPS_EN_Pin, 1); // Turn off GPS.
+	  if (gpsFound) {
+		createFrame(tx_message, sizeof(tx_message), gps, voltage);
+	  } else {
+		createStatusFrame(tx_message, sizeof(tx_message), voltage);
+	  }
+	  memcpy(&loraTxBuffer[3], (uint8_t*) tx_message, strlen(tx_message));
+	  HAL_Delay(100);
+
+	  LoRa_config_polifloater();
+
 	  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
-	  nmea_parse(&gps, gpsBuffer);
+	  LoRa_Send(loraTxBuffer, strlen(tx_message) + 3);
 	  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);
+
+	  LoRa_Sleep();
+
+	  HAL_Delay(gps.altitude <= 3000 ? 315000 : 915000);
   }
-
-  HAL_GPIO_WritePin(GPS_EN_GPIO_Port, GPS_EN_Pin, 1); // Turn off GPS.
-  createFrame(tx_message, 255, gps, voltage);
-  memcpy(&loraTxBuffer[3], (uint8_t*) tx_message, strlen(tx_message));
-  HAL_Delay(100);
-
-
-  LoRa_config_polifloater();
-
-  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
-  LoRa_Send(loraTxBuffer, strlen(tx_message) + 3);
-  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);
-
-  LoRa_Sleep();
-
-  Enter_Standby_s(315);
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -212,6 +227,7 @@ void SystemClock_Config(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
+	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
   while (1)

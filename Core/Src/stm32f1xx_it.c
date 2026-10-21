@@ -212,6 +212,14 @@ void RTC_IRQHandler(void)
   /* USER CODE END RTC_IRQn 1 */
 }
 
+/**
+  * @brief This function handles RTC alarm interrupt.
+  */
+void RTC_Alarm_IRQHandler(void)
+{
+  HAL_RTC_AlarmIRQHandler(&hrtc);
+}
+
 /* USER CODE BEGIN 1 */
 
 /* USER CODE END 1 */
